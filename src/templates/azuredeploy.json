@@ -2,6 +2,11 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
+        "LabName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 9
+        },
         "adminUsername": {
             "type": "string",
             "metadata": {
@@ -61,18 +66,54 @@
             "metadata": {
                 "description": "Location for all resources."
             }
+        },
+        "DCWindowsOSVersion": {
+            "type": "string",
+            "defaultValue": "2016-Datacenter",
+            "allowedValues": [
+                "2012-R2-Datacenter",
+                "2016-Datacenter",
+                "2019-Datacenter"
+            ]
+        },
+        "ManagementServerWindowsOSVersion": {
+            "type": "string",
+            "defaultValue": "2016-Datacenter",
+            "allowedValues": [
+                "2012-R2-Datacenter",
+                "2016-Datacenter",
+                "2019-Datacenter"
+            ]
+        },
+            "ScomServerWindowsOSVersion": {
+            "type": "string",
+            "defaultValue": "2016-Datacenter",
+            "allowedValues": [
+                "2012-R2-Datacenter",
+                "2016-Datacenter",
+                "2019-Datacenter"
+            ]
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_ZRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ]
         }
     },
     "variables": {
-        "storageAccountType": "Premium_LRS",
-        "adPDCVMName": "adPDC",
-        "adBDCVMName": "adBDC",
+        "adPDCVMName": "[concat(parameters('LabName'),'ADPDC')]",
+        "adBDCVMName": "[concat(parameters('LabName'),'ADBDC')]",
         "imagePublisher": "MicrosoftWindowsServer",
         "imageOffer": "WindowsServer",
-        "imageSKU": "2016-Datacenter",
         "adAvailabilitySetName": "adAvailabiltySet",
         "publicIPAddressName": "ad-lb-pip",
-        "adVMSize": "Standard_DS2_v2",
+        "adVMSize": "Standard_D1_V2",
         "adLBFE": "LBFE",
         "adLBBE": "LBBE",
         "adPDCRDPNAT": "adPDCRDP",
@@ -302,7 +343,7 @@
                     "imageReference": {
                         "publisher": "[variables('imagePublisher')]",
                         "offer": "[variables('imageOffer')]",
-                        "sku": "[variables('imageSKU')]",
+                        "sku": "[parameters('DCWindowsOSVersion')]",
                         "version": "latest"
                     },
                     "osDisk": {
@@ -310,21 +351,9 @@
                         "caching": "ReadWrite",
                         "createOption": "FromImage",
                         "managedDisk": {
-                            "storageAccountType": "[variables('storageAccountType')]"
+                            "storageAccountType": "[parameters('storageAccountType')]"
                         }
-                    },
-                    "dataDisks": [
-                        {
-                            "name": "[concat(variables('adPDCVMName'),'_data-disk1')]",
-                            "caching": "None",
-                            "diskSizeGB": "[variables('adDataDiskSize')]",
-                            "lun": 0,
-                            "createOption": "Empty",
-                            "managedDisk": {
-                                "storageAccountType": "[variables('storageAccountType')]"
-                            }
-                        }
-                    ]
+                    }
                 },
                 "networkProfile": {
                     "networkInterfaces": [
@@ -478,7 +507,7 @@
                     "imageReference": {
                         "publisher": "[variables('imagePublisher')]",
                         "offer": "[variables('imageOffer')]",
-                        "sku": "[variables('imageSKU')]",
+                        "sku": "[parameters('DCWindowsOSVersion')]",
                         "version": "latest"
                     },
                     "osDisk": {
@@ -486,7 +515,7 @@
                         "caching": "ReadWrite",
                         "createOption": "FromImage",
                         "managedDisk": {
-                            "storageAccountType": "[variables('storageAccountType')]"
+                            "storageAccountType": "[parameters('storageAccountType')]"
                         }
                     },
                     "dataDisks": [
@@ -497,7 +526,7 @@
                             "lun": 0,
                             "createOption": "Empty",
                             "managedDisk": {
-                                "storageAccountType": "[variables('storageAccountType')]"
+                                "storageAccountType": "[parameters('storageAccountType')]"
                             }
                         }
                     ]
