@@ -1,0 +1,247 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/deploymentTemplate.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "LabName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 9
+    },
+
+    "ADAdminUserName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ADAdminPassword": {
+      "type": "securestring"
+    },
+    "DCWindowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2016-Datacenter",
+      "allowedValues": [
+        "2012-R2-Datacenter",
+        "2016-Datacenter",
+        "2019-Datacenter"
+      ]
+    },
+    "ManagementServerWindowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2016-Datacenter",
+      "allowedValues": [
+        "2012-R2-Datacenter",
+        "2016-Datacenter",
+        "2019-Datacenter"
+      ]
+    },
+    "ScomServerWindowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2016-Datacenter",
+      "allowedValues": [
+        "2012-R2-Datacenter",
+        "2016-Datacenter",
+        "2019-Datacenter"
+      ]
+    },
+    "StorageType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Premium_LRS"
+      ]
+    },
+    "_artifactsLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "Auto-generated container in staging storage account to receive post-build staging folder upload"
+      }
+    },
+    "_artifactsLocationSasToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Auto-generated token to access _artifactsLocation"
+      }
+    }
+  },
+  "variables": {
+    "ScomLab_StorageAccountName": "[concat(toLower(parameters('LabName')), uniqueString(resourceGroup().id))]",
+    "ScomLab_ProdNetworkPrefix": "10.0.0.0/16",
+    "ScomLab_ProdNetworkSubnet1Name": "Subnet-1",
+    "ScomLab_ProdNetworkSubnet1Prefix": "10.0.0.0/24",
+    "ScomLab_ProdNetworkSubnet2Name": "Subnet-2",
+    "ScomLab_ProdNetworkSubnet2Prefix": "10.0.1.0/24",
+    "ADDC1Name": "[concat(parameters('LabName'),'ADDC1')]",
+    "ADDC1ImagePublisher": "MicrosoftWindowsServer",
+    "ADDC1ImageOffer": "WindowsServer",
+    "ADDC1OSDiskName": "ADDC1OSDisk",
+    "ADDC1VmSize": "Standard_D2_v2",
+    "ADDC1VnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'ScomLab_ProdNetwork')]",
+    "ADDC1SubnetRef": "[concat(variables('ADDC1VnetID'), '/subnets/', variables('ScomLab_ProdNetworkSubnet1Name'))]",
+    "ADDC1StorageAccountContainerName": "vhds",
+    "ADDC1NicName": "[concat(variables('ADDC1Name'), 'NetworkInterface')]",
+    "CreateADForestArchiveFolder": "DSC",
+    "CreateADForestArchiveFileName": "CreateADForest.zip"
+  },
+  "resources": [
+    {
+      "name": "[variables('ScomLab_StorageAccountName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-01-01",
+      "sku": {
+        "name": "[parameters('StorageType')]"
+      },
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "ScomLab"
+      },
+      "kind": "Storage"
+    },
+    {
+      "name": "ScomLab_ProdNetwork",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "ScomLab_ProdNetwork"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('ScomLab_ProdNetworkPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('ScomLab_ProdNetworkSubnet1Name')]",
+            "properties": {
+              "addressPrefix": "[variables('ScomLab_ProdNetworkSubnet1Prefix')]"
+            }
+          },
+          {
+            "name": "[variables('ScomLab_ProdNetworkSubnet2Name')]",
+            "properties": {
+              "addressPrefix": "[variables('ScomLab_ProdNetworkSubnet2Prefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('ADDC1NicName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', 'ScomLab_ProdNetwork')]"
+      ],
+      "tags": {
+        "displayName": "ADDC1Nic"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('ADDC1SubnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('ADDC1Name')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('ScomLab_StorageAccountName'))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('ADDC1NicName'))]"
+      ],
+      "tags": {
+        "displayName": "ADDC1"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('ADDC1VmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[variables('ADDC1Name')]",
+          "adminUsername": "[parameters('ADAdminUsername')]",
+          "adminPassword": "[parameters('ADAdminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('ADDC1ImagePublisher')]",
+            "offer": "[variables('ADDC1ImageOffer')]",
+            "sku": "[parameters('DCWindowsOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "ADDC1OSDisk",
+            "vhd": {
+              "uri": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('ScomLab_StorageAccountName')), '2016-01-01').primaryEndpoints.blob, variables('ADDC1StorageAccountContainerName'), '/', variables('ADDC1OSDiskName'), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('ADDC1NicName'))]"
+            }
+          ]
+        }
+      },
+      "resources": [
+        {
+          "name": "Microsoft.Powershell.DSC",
+          "type": "extensions",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2016-03-30",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', variables('ADDC1Name'))]"
+          ],
+          "tags": {
+            "displayName": "CreateADForest"
+          },
+          "properties": {
+            "publisher": "Microsoft.Powershell",
+            "type": "DSC",
+            "typeHandlerVersion": "2.9",
+            "autoUpgradeMinorVersion": true,
+            "settings": {
+              "configuration": {
+                "url": "[concat(parameters('_artifactsLocation'), '/', variables('CreateADForestArchiveFolder'), '/', variables('CreateADForestArchiveFileName'))]",
+                "script": "CreateADForest.ps1",
+                "function": "Main"
+              },
+              "configurationArguments": {
+                "NodeName": "[variables('ADDC1Name')]",
+                "DomainName": "[parameters('LabName')]",
+                "ADAdminCredential": {
+                  "UserName": "[parameters('ADAdminUserName')]",
+                  "Password": "PrivateSettingsRef:adAdminPasswordProtected"
+                }
+              }
+            },
+            "protectedSettings": {
+              "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]",
+              "Items": {
+                "adAdminPasswordProtected": "[parameters('ADAdminPassword')]"
+              }
+            }
+          }
+        }
+      ]
+    }],
+  "outputs": {}
+}

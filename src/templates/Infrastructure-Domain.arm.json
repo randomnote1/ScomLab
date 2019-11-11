@@ -1,0 +1,402 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "LabName": {
+            "type" : "string"
+        },
+        "BlobStorageDomain": {
+            "type": "string"
+        },
+        "StorageName": {
+            "type": "string"
+        },
+        "StorageType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_ZRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ]
+        },
+        "VMSize": {
+            "type": "string",
+            "defaultValue": "Standard_D1_V2",
+            "allowedValues": [
+                "Standard_D1_V2",
+                "Standard_D2_V2",
+                "Standard_D3_V2",
+                "Standard_A1",
+                "Standard_A2"
+            ]
+        },
+        "ComputerAdminUserName": {
+            "type": "string",
+            "minLength": 1
+        },
+        "ComputerAdminPassword": {
+            "type": "securestring"
+        },
+        "VMPrefix": {
+            "type": "string"
+        },
+        "DomainControllersPerDatacenter": {
+            "type": "int"
+        },
+        "ManagementServersPerDatacenter": {
+            "type": "int"
+        }
+    },
+    "variables": {
+        "VMImagePublisher": "MicrosoftWindowsServer",
+        "VMImageOffer": "WindowsServer",
+        "WindowsOSVersion": "2012-R2-Datacenter",
+        "VMStorageAccountContainerName": "VHD",
+
+        "prodNetwork": "10.11.0.0/16",
+        "prodNetworkName": "[concat(parameters('LabName'),'_ProdNetwork')]",
+        "prodNetworkOctets": "[split(variables('prodNetwork'),'.')]",
+
+        "replicationNetwork": "10.12.0.0/16",
+        "replicationNetworkName": "[concat(parameters('LabName'),'_ReplicationNetwork')]",
+        "replicationNetworkOctets": "[split(variables('replicationNetwork'),'.')]",
+
+        "prodNetworkSubnetManagement": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',variables('prodNetworkOctets')[2],'.0/24')]",
+        "prodNetworkSubnetManagementName": "[concat(variables('prodNetworkName'),'ManagementSubnet')]",
+        "prodNetworkSubnetManagementNetworkDefinition": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',variables('prodNetworkOctets')[2],'.')]",
+        
+        "prodNetworkSubnetDatabase": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',add(int(variables('prodNetworkOctets')[2]),1),'.0/24')]",
+        "prodNetworkSubnetDatabaseName": "[concat(variables('prodNetworkName'),'DatabaseSubnet')]",
+        "prodNetworkSubnetDatabaseNetworkDefinition": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',add(int(variables('prodNetworkOctets')[2]),1),'.')]",
+
+        "prodNetworkSubnetApplication": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',add(int(variables('prodNetworkOctets')[2]),2),'.0/24')]",
+        "prodNetworkSubnetApplicationName": "[concat(variables('prodNetworkName'),'ApplicationSubnet')]",
+        "prodNetworkSubnetApplicationNetworkDefinition": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',add(int(variables('prodNetworkOctets')[2]),2),'.')]",
+
+        "prodNetworkSubnetWeb": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',add(int(variables('prodNetworkOctets')[2]),3),'.0/24')]",
+        "prodNetworkSubnetWebName": "[concat(variables('prodNetworkName'),'WebSubnet')]",
+        "prodNetworkSubnetWebNetworkDefinition": "[concat(variables('prodNetworkOctets')[0],'.',variables('prodNetworkOctets')[1],'.',add(int(variables('prodNetworkOctets')[2]),3),'.0')]",
+
+        "replicationNetworkSubnet": "[variables('replicationNetwork')]",
+        "replicationNetworkSubnetName": "[concat(variables('replicationNetworkName'),'Subnet')]",
+        "replicationNetworkSubnetDefinition": "[concat(variables('replicationNetworkOctets')[0],'.',variables('replicationNetworkOctets')[1],'.',variables('replicationNetworkOctets')[2],'.0')]",
+
+        "prodNetworkDomainControllerFirstIP": 5,
+        "prodNetworkManagementServerFirstIP": 20,
+        "prodNetworkSqlServerFirstIP": 10,
+        "prodNetworkSqlServerFailoverClusterFirstIP": 30,
+        "prodNetworkSqlServerFailoverClusterInstanceFirstIP": 40,
+        "prodNetworkSqlServerAvailabilityGroupListenerFirstIP": 50,
+        "prodNetworkApplicationServerFirstIP": 10,
+        "prodNetworkWebServerFirstIP": 10,
+
+        "DomainControllerServerIdentifier": "[concat(parameters('VMPrefix'),'ADDC')]",
+        "DomainControllerServerDataDisk" : 20,
+
+        "ManagementServerIdentifier": "[concat(parameters('VMPrefix'),'MGMT')]",
+        "ManagementServerDataDiskSize": 100
+    },
+    "resources": [
+        {
+            "comments": "Create an Azure automation account to be used with the lab",
+            "type": "Microsoft.Automation/automationAccounts",
+            "name": "[concat(parameters('LabName'),'AutomationAccount')]",
+            "apiVersion": "2015-10-31",
+            "location": "USGov Virginia",
+            "scale": null,
+            "properties": {
+                "sku": {
+                    "name": "Basic"
+                }
+            }
+        },
+        {
+            "comments": "Create the storage account for the lab",
+            "name": "[parameters('storageName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "tags": {
+                "displayName": "[parameters('storageName')]"
+            },
+            "properties": {
+                "accountType": "[parameters('storageType')]"
+            }
+        },
+        {
+            "comments": "Create the prod network",
+            "name": "[variables('prodNetworkName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('prodNetwork')]"
+                    ]
+                },
+                "dhcpOptions": {
+                "dnsServers": [
+                    "[concat(variables('prodNetworkSubnetManagementNetworkDefinition'),variables('prodNetworkDomainControllerFirstIP'))]"
+                ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('prodNetworkSubnetManagementName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('prodNetworkSubnetManagement')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('prodNetworkSubnetDatabaseName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('prodNetworkSubnetDatabase')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('prodNetworkSubnetApplicationName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('prodNetworkSubnetApplication')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('prodNetworkSubnetWebName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('prodNetworkSubnetWeb')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "comments": "Create the replication network",
+            "name": "[variables('replicationNetworkName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('replicationNetwork')]"
+                    ]
+                },
+                "dhcpOptions": {
+                "dnsServers": []
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('replicationNetworkSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('replicationNetworkSubnet')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "comments": "Create the domain controller NIC(s).",
+            "copy": {
+                "name": "DomainControllerNICs",
+                "count": "[parameters('DomainControllersPerDatacenter')]"
+            },
+            "apiVersion": "2015-06-15",
+            "dependsOn": [ "[concat('Microsoft.Network/virtualNetworks/',variables('prodNetworkName'))]" ],
+            "type": "Microsoft.Network/networkInterfaces",
+            "location":"[resourceGroup().location]",
+            "name" : "[concat(variables('DomainControllerServerIdentifier'),add(copyIndex(),1),'-ProdNIC')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[concat(variables('prodNetworkSubnetManagementNetworkDefinition'),add(variables('prodNetworkDomainControllerFirstIP'),copyIndex()))]",
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks/',variables('prodNetworkName')),'/subnets/',variables('prodNetworkSubnetManagementName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "comments": "Create the domain controllers",
+            "copy": {
+                "name": "DomainControllers",
+                "count": "[parameters('DomainControllersPerDatacenter')]"
+            },
+            "name": "[concat(variables('DomainControllerServerIdentifier'),add(copyIndex(),1))]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2018-10-01",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('DomainControllerServerIdentifier'),add(copyIndex(),1),'-ProdNIC'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts/', parameters('storageName'))]"
+            ],
+            "tags": {
+                "displayName": "[concat(variables('DomainControllerServerIdentifier'),add(copyIndex(),1))]"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('VMSize')]"
+                },
+                "osProfile": {
+                    "computerName": "[concat(variables('DomainControllerServerIdentifier'),add(copyIndex(),1))]",
+                    "adminUsername": "[parameters('ComputerAdminUserName')]",
+                    "adminPassword": "[parameters('ComputerAdminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('VMImagePublisher')]",
+                        "offer": "[variables('VMImageOffer')]",
+                        "sku": "[variables('WindowsOSVersion')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        }
+                    },
+                    "dataDisks": [
+                        {
+                            "createOption": "Empty",
+                            "diskSizeGB": "[variables('DomainControllerServerDataDisk')]",
+                            "lun": 0,
+                            "managedDisk": {
+                                "storageAccountType": "Standard_LRS"
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('DomainControllerServerIdentifier'),add(copyIndex(),1),'-ProdNIC'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "comments": "Create the management server prod NIC(s).",
+            "copy": {
+                "name": "ManagementServerProdNICs",
+                "count": "[parameters('ManagementServersPerDatacenter')]"
+            },
+            "apiVersion": "2018-10-01",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/',variables('prodNetworkName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts/', parameters('storageName'))]"
+            ],
+            "type": "Microsoft.Network/networkInterfaces",
+            "location":"[resourceGroup().location]",
+            "name" : "[concat(variables('ManagementServerIdentifier'),add(copyIndex(),1),'-ProdNIC')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[concat(variables('prodNetworkSubnetManagementNetworkDefinition'),add(variables('prodNetworkManagementServerFirstIP'),copyIndex()))]",
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks/',variables('prodNetworkName')),'/subnets/',variables('prodNetworkSubnetManagementName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "comments": "Create the management servers",
+            "copy": {
+                "name": "Management Servers",
+                "count": "[parameters('ManagementServersPerDatacenter')]"
+            },
+            "name": "[concat(variables('ManagementServerIdentifier'),add(copyIndex(),1))]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2018-10-01",
+            "dependsOn": [ 
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('ManagementServerIdentifier'),add(copyIndex(),1),'-ProdNIC'))]"
+            ],
+            "tags": {
+                "displayName": "[concat(variables('ManagementServerIdentifier'),add(copyIndex(),1))]"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('VMSize')]"
+                },
+                "osProfile": {
+                    "computerName": "[concat(variables('ManagementServerIdentifier'),add(copyIndex(),1))]",
+                    "adminUsername": "[parameters('ComputerAdminUserName')]",
+                    "adminPassword": "[parameters('ComputerAdminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('VMImagePublisher')]",
+                        "offer": "[variables('VMImageOffer')]",
+                        "sku": "[variables('WindowsOSVersion')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        }
+                    },
+                    "dataDisks": [
+                        {
+                            "createOption": "Empty",
+                            "diskSizeGB": "[variables('ManagementServerDataDiskSize')]",
+                            "lun": 0,
+                            "managedDisk": {
+                                "storageAccountType": "Standard_LRS"
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('ManagementServerIdentifier'),add(copyIndex(),1),'-ProdNIC'))]"
+                        }
+                    ]
+                }
+            },
+            "resources": [
+                {
+                    "type": "extensions",
+                    "apiVersion": "2019-03-01",
+                    "name": "CreateADForest",
+                    "location": "[resourceGroup().location]",
+                    "properties": {
+                        "publisher": "Microsoft.Powershell",
+                        "type": "DSC",
+                        "typeHandlerVersion": "2.19",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "ModulesUrl": "[uri(parameters('_artifactsLocation'), concat('DSC/CreateADPDC.zip', parameters('_artifactsLocationSasToken')))]",
+                            "ConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC",
+                            "Properties": {
+                                "DomainName": "[parameters('domainName')]",
+                                "AdminCreds": {
+                                    "UserName": "[parameters('adminUsername')]",
+                                    "Password": "PrivateSettingsRef:AdminPassword"
+                                }
+                            }
+                        },
+                        "protectedSettings": {
+                            "Items": {
+                                "AdminPassword": "[parameters('adminPassword')]"
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}
