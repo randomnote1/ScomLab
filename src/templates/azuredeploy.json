@@ -133,7 +133,7 @@
         "adPDCRDPNATRuleID": "[concat(variables('adlbID'),'/inboundNatRules/',variables('adPDCRDPNAT'))]",
         "adBDCRDPNATRuleID": "[concat(variables('adlbID'),'/inboundNatRules/',variables('adBDCRDPNAT'))]",
         "adBEAddressPoolID": "[concat(variables('adlbID'),'/backendAddressPools/',variables('adLBBE'))]",
-        "adDataDiskSize": 100,
+        "adDataDiskSize": 1024,
         "vnetTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/vnet.json', parameters('_artifactsLocationSasToken'))]",
         "nicTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/nic.json', parameters('_artifactsLocationSasToken'))]",
         "vnetwithDNSTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/vnet-with-dns-server.json', parameters('_artifactsLocationSasToken'))]",
