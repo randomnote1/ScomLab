@@ -111,29 +111,29 @@
         "adBDCVMName": "[concat(parameters('LabName'),'ADBDC')]",
         "imagePublisher": "MicrosoftWindowsServer",
         "imageOffer": "WindowsServer",
-        "adAvailabilitySetName": "adAvailabiltySet",
+        "adAvailabilitySetName": "[concat(parameters('LabName'),'ADAvailabiltySet')]",
         "publicIPAddressName": "ad-lb-pip",
         "adVMSize": "Standard_D1_V2",
-        "adLBFE": "LBFE",
-        "adLBBE": "LBBE",
-        "adPDCRDPNAT": "adPDCRDP",
-        "adBDCRDPNAT": "adBDCRDP",
-        "virtualNetworkName": "adVNET",
+        "adLBFE": "[concat(parameters('LabName'),'LBFE')]",
+        "adLBBE": "[concat(parameters('LabName'),'LBBE')]",
+        "adPDCRDPNAT": "[concat(parameters('LabName'),'adPDCRDP')]",
+        "adBDCRDPNAT": "[concat(parameters('LabName'),'adBDCRDP')]",
+        "virtualNetworkName": "[concat(parameters('LabName'),'adVNET')]",
         "virtualNetworkAddressRange": "10.0.0.0/16",
-        "adSubnetName": "adSubnet",
+        "adSubnetName": "[concat(parameters('LabName'),'adSubnet')]",
         "adSubnet": "10.0.0.0/24",
-        "adPDCNicName": "adPDCNic",
+        "adPDCNicName": "[concat(parameters('LabName'),'adPDCNic')]",
         "adPDCNicIPAddress": "10.0.0.4",
-        "adBDCNicName": "adBDCNic",
+        "adBDCNicName": "[concat(parameters('LabName'),'adBDCNic')]",
         "adBDCNicIPAddress": "10.0.0.5",
         "adSubnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('adSubnetName'))]",
-        "adLBName": "adLoadBalancer",
+        "adLBName": "[concat(parameters('LabName'),'adLoadBalancer')]",
         "adlbID": "[resourceId('Microsoft.Network/loadBalancers',variables('adLBName'))]",
         "adlbFEConfigID": "[concat(variables('adlbID'),'/frontendIPConfigurations/',variables('adLBFE'))]",
         "adPDCRDPNATRuleID": "[concat(variables('adlbID'),'/inboundNatRules/',variables('adPDCRDPNAT'))]",
         "adBDCRDPNATRuleID": "[concat(variables('adlbID'),'/inboundNatRules/',variables('adBDCRDPNAT'))]",
         "adBEAddressPoolID": "[concat(variables('adlbID'),'/backendAddressPools/',variables('adLBBE'))]",
-        "adDataDiskSize": 1000,
+        "adDataDiskSize": 100,
         "vnetTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/vnet.json', parameters('_artifactsLocationSasToken'))]",
         "nicTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/nic.json', parameters('_artifactsLocationSasToken'))]",
         "vnetwithDNSTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/vnet-with-dns-server.json', parameters('_artifactsLocationSasToken'))]",
@@ -353,7 +353,19 @@
                         "managedDisk": {
                             "storageAccountType": "[parameters('storageAccountType')]"
                         }
-                    }
+                    },
+                    "dataDisks": [
+                        {
+                            "name": "[concat(variables('adPDCVMName'),'_data-disk1')]",
+                            "caching": "None",
+                            "diskSizeGB": "[variables('adDataDiskSize')]",
+                            "lun": 0,
+                            "createOption": "Empty",
+                            "managedDisk": {
+                                "storageAccountType": "[variables('storageAccountType')]"
+                            }
+                        }
+                    ]
                 },
                 "networkProfile": {
                     "networkInterfaces": [
@@ -520,13 +532,13 @@
                     },
                     "dataDisks": [
                         {
-                            "name": "[concat(variables('adBDCVMName'),'_data-disk1')]",
+                            "name": "[concat(variables('adPDCVMName'),'_data-disk1')]",
                             "caching": "None",
                             "diskSizeGB": "[variables('adDataDiskSize')]",
                             "lun": 0,
                             "createOption": "Empty",
                             "managedDisk": {
-                                "storageAccountType": "[parameters('storageAccountType')]"
+                                "storageAccountType": "[variables('storageAccountType')]"
                             }
                         }
                     ]
