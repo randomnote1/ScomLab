@@ -1,5 +1,5 @@
 #Requires -Version 3.0
-#Requires -Modules Az.Accounts
+#Requires -Modules Az.Accounts,Az.Resources,Az.Storage
 
 [CmdletBinding()]
 param

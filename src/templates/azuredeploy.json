@@ -407,7 +407,7 @@
                 {
                     "name": "CreateADForest",
                     "type": "extensions",
-                    "apiVersion": "2016-03-30",
+                    "apiVersion": "2017-03-30",
                     "location": "[parameters('location')]",
                     "dependsOn": [
                         "[resourceId('Microsoft.Compute/virtualMachines', variables('adPDCVMName'))]"
@@ -583,7 +583,7 @@
         {
             "type": "Microsoft.Compute/virtualMachines/extensions",
             "name": "[concat(variables('adBDCVMName'),'/PrepareBDC')]",
-            "apiVersion": "2016-03-30",
+            "apiVersion": "2019-03-01",
             "location": "[parameters('location')]",
             "dependsOn": [
                 "[concat('Microsoft.Compute/virtualMachines/', variables('adBDCVMName'))]"
@@ -599,7 +599,8 @@
                     "Properties": {
                         "DNSServer": "[variables('adPDCNicIPAddress')]"
                     }
-                }
+                },
+                "protectedSettings": {}
             }
         },
         {
