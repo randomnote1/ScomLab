@@ -532,13 +532,13 @@
                     },
                     "dataDisks": [
                         {
-                            "name": "[concat(variables('adPDCVMName'),'_data-disk1')]",
+                            "name": "[concat(variables('adBDCVMName'),'_data-disk1')]",
                             "caching": "None",
                             "diskSizeGB": "[variables('adDataDiskSize')]",
                             "lun": 0,
                             "createOption": "Empty",
                             "managedDisk": {
-                                "storageAccountType": "[parameters('storageAccountType')]"
+                                "storageAccountType": "[variables('storageAccountType')]"
                             }
                         }
                     ]

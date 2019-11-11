@@ -1,4 +1,5 @@
-#Reqires -Modules Az
+#Requires -Version 3.0
+#Requires -Modules Az.Accounts
 
 [CmdletBinding()]
 param
@@ -56,7 +57,7 @@ catch
     if ( [string]::IsNullOrEmpty($Location) )
     {
         # Select a location for the resource group
-        $selectedLocation = Get-AzureRmLocation | Out-GridView -PassThru
+        $selectedLocation = Get-AzLocation | Out-GridView -PassThru
         $Location = $selectedLocation.Location
     }
 
@@ -121,7 +122,21 @@ $basicInfrastructureParams = @{
 }
 $baseInfrastructureResults = New-AzResourceGroupDeployment @basicInfrastructureParams
 #>
-New-AzResourceGroupDeployment -ResourceGroupName $LabName -TemplateUri https://raw.githubusercontent.com/randomnote1/ScomLab/CreateDomain/src/templates/azuredeploy.json
+
+$params = @{
+    ResourceGroupName = $LabName
+    TemplateUri = 'https://raw.githubusercontent.com/randomnote1/ScomLab/CreateDomain/src/templates/azuredeploy.json'
+    TemplateParameterObject = @{
+        LabName = $LabName
+        adminUsername = $ComputerAdminUserName
+        adminPassword = $ComputerAdminPassword
+        domainName = 'DanLab.local'
+        dnsPrefix = $LabName.ToLower()
+        storageAccountType = $StorageType
+    }
+}
+
+New-AzResourceGroupDeployment @params
 
 
 # Deploy domain infrastructure
