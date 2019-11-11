@@ -107,11 +107,11 @@
         }
     },
     "variables": {
-        "adPDCVMName": "[concat(parameters('LabName'),'ADPDC')]",
-        "adBDCVMName": "[concat(parameters('LabName'),'ADBDC')]",
+        "adPDCVMName": "[concat(parameters('LabName'),'adPDC')]",
+        "adBDCVMName": "[concat(parameters('LabName'),'adBDC')]",
         "imagePublisher": "MicrosoftWindowsServer",
         "imageOffer": "WindowsServer",
-        "adAvailabilitySetName": "[concat(parameters('LabName'),'ADAvailabiltySet')]",
+        "adAvailabilitySetName": "[concat(parameters('LabName'),'adAvailabiltySet')]",
         "publicIPAddressName": "ad-lb-pip",
         "adVMSize": "Standard_D1_V2",
         "adLBFE": "[concat(parameters('LabName'),'LBFE')]",
