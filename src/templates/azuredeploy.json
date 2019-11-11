@@ -538,7 +538,7 @@
                             "lun": 0,
                             "createOption": "Empty",
                             "managedDisk": {
-                                "storageAccountType": "[variables('storageAccountType')]"
+                                "storageAccountType": "[parameters('storageAccountType')]"
                             }
                         }
                     ]
