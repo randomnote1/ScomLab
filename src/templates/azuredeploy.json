@@ -109,11 +109,13 @@
     "variables": {
         "adPDCVMName": "[concat(parameters('LabName'),'adPDC')]",
         "adBDCVMName": "[concat(parameters('LabName'),'adBDC')]",
+        "mgmtVMName": "[concat(parameters('LabName'),'mgmt')]",
         "imagePublisher": "MicrosoftWindowsServer",
         "imageOffer": "WindowsServer",
         "adAvailabilitySetName": "[concat(parameters('LabName'),'adAvailabiltySet')]",
         "publicIPAddressName": "ad-lb-pip",
         "adVMSize": "Standard_D1_V2",
+        "mgmtVMSize": "Standard_D1_V2",
         "adLBFE": "[concat(parameters('LabName'),'LBFE')]",
         "adLBBE": "[concat(parameters('LabName'),'LBBE')]",
         "adPDCRDPNAT": "[concat(parameters('LabName'),'adPDCRDP')]",
@@ -126,6 +128,8 @@
         "adPDCNicIPAddress": "10.0.0.4",
         "adBDCNicName": "[concat(parameters('LabName'),'adBDCNic')]",
         "adBDCNicIPAddress": "10.0.0.5",
+        "mgmtNicName": "[concat(parameters('LabName'),'mgmtNic')]",
+        "mgmtNicIPAddress": "10.0.0.6",
         "adSubnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('adSubnetName'))]",
         "adLBName": "[concat(parameters('LabName'),'adLoadBalancer')]",
         "adlbID": "[resourceId('Microsoft.Network/loadBalancers',variables('adLBName'))]",
@@ -134,6 +138,7 @@
         "adBDCRDPNATRuleID": "[concat(variables('adlbID'),'/inboundNatRules/',variables('adBDCRDPNAT'))]",
         "adBEAddressPoolID": "[concat(variables('adlbID'),'/backendAddressPools/',variables('adLBBE'))]",
         "adDataDiskSize": 1024,
+        "mgmtDataDiskSize": 1024,
         "vnetTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/vnet.json', parameters('_artifactsLocationSasToken'))]",
         "nicTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/nic.json', parameters('_artifactsLocationSasToken'))]",
         "vnetwithDNSTemplateUri": "[concat(parameters('_artifactsLocation'),'/nestedtemplates/vnet-with-dns-server.json', parameters('_artifactsLocationSasToken'))]",
@@ -312,6 +317,29 @@
                                     "id": "[variables('adBDCRDPNATRuleID')]"
                                 }
                             ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[variables('mgmtNicName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2016-10-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "Microsoft.Resources/deployments/VNet"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[variables('mgmtNicIPAddress')]",
+                            "subnet": {
+                                "id": "[variables('adSubnetRef')]"
+                            }
                         }
                     }
                 ]
@@ -645,6 +673,60 @@
                             "[variables('adBDCNicIPAddress')]"
                         ]
                     }
+                }
+            }
+        },
+        {
+            "name": "[variables('mgmtVMName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2017-03-30",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces',variables('mgmtNicName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('mgmtVMSize')]"
+                },
+                "osProfile": {
+                    "computerName": "[variables('mgmtVMName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('imagePublisher')]",
+                        "offer": "[variables('imageOffer')]",
+                        "sku": "[parameters('ManagementServerWindowsOSVersion')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(variables('mgmtVMName'),'_OSDisk')]",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('storageAccountType')]"
+                        }
+                    },
+                    "dataDisks": [
+                        {
+                            "name": "[concat(variables('mgmtVMName'),'_data-disk1')]",
+                            "caching": "None",
+                            "diskSizeGB": "[variables('mgmtDataDiskSize')]",
+                            "lun": 0,
+                            "createOption": "Empty",
+                            "managedDisk": {
+                                "storageAccountType": "[parameters('storageAccountType')]"
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('mgmtNicName'))]"
+                        }
+                    ]
                 }
             }
         }
